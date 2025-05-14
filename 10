@@ -1,0 +1,210 @@
+#include <iostream>
+#include <vector>
+#include <memory>
+#include <algorithm>
+#include <fstream>
+#include <stdexcept>
+#include <sstream>
+
+//  Базовый класс User 
+class User {
+protected:
+    std::string name;
+    int id;
+    int accessLevel;
+
+public:
+    User(const std::string& n, int i, int al) : name(n), id(i), accessLevel(al) {
+        if (al < 0 || n.empty()) 
+            throw std::invalid_argument("Некорректные данные пользователя");
+    }
+
+    virtual ~User() = default;
+
+    virtual void displayInfo() const {
+        std::cout << "Имя: " << name << ", ID: " << id 
+                  << ", Уровень доступа: " << accessLevel << std::endl;
+    }
+
+    // Геттеры
+    std::string getName() const { return name; }
+    int getId() const { return id; }
+    int getAccessLevel() const { return accessLevel; }
+
+    // Сеттеры
+    void setName(const std::string& n) { name = n; }
+    void setId(int i) { id = i; }
+    void setAccessLevel(int al) { accessLevel = al; }
+};
+
+//  Производные классы 
+class Student : public User {
+private:
+    std::string group;
+
+public:
+    Student(const std::string& n, int i, int al, const std::string& g) 
+        : User(n, i, al), group(g) {}
+
+    void displayInfo() const override {
+        std::cout << "[Студент] ";
+        User::displayInfo();
+        std::cout << "Группа: " << group << std::endl;
+    }
+};
+
+class Teacher : public User {
+private:
+    std::string department;
+
+public:
+    Teacher(const std::string& n, int i, int al, const std::string& d) 
+        : User(n, i, al), department(d) {}
+
+    void displayInfo() const override {
+        std::cout << "[Преподаватель] ";
+        User::displayInfo();
+        std::cout << "Кафедра: " << department << std::endl;
+    }
+};
+
+class Administrator : public User {
+public:
+    Administrator(const std::string& n, int i, int al) 
+        : User(n, i, al) {}
+
+    void displayInfo() const override {
+        std::cout << "[Администратор] ";
+        User::displayInfo();
+    }
+};
+
+//  Класс Resource 
+class Resource {
+private:
+    std::string name;
+    int requiredAccessLevel;
+
+public:
+    Resource(const std::string& n, int ral) : name(n), requiredAccessLevel(ral) {
+        if (ral < 0) throw std::invalid_argument("Некорректный уровень доступа");
+    }
+
+    bool checkAccess(const User& user) const {
+        return user.getAccessLevel() >= requiredAccessLevel;
+    }
+
+    std::string getName() const { return name; }
+};
+
+//  Шаблонный класс AccessControlSystem 
+template<typename T>
+class AccessControlSystem {
+private:
+    std::vector<std::unique_ptr<User>> users;
+    std::vector<Resource> resources;
+
+public:
+    void addUser(std::unique_ptr<User> user) {
+        users.push_back(std::move(user));
+    }
+
+    void addResource(const Resource& res) {
+        resources.push_back(res);
+    }
+
+    bool checkAccess(int userId, const std::string& resName) const {
+        auto userIt = std::find_if(users.begin(), users.end(), 
+            [userId](const auto& u) { return u->getId() == userId; });
+
+        auto resIt = std::find_if(resources.begin(), resources.end(), 
+            [resName](const auto& r) { return r.getName() == resName; });
+
+        if (userIt == users.end() || resIt == resources.end()) 
+            return false;
+
+        return resIt->checkAccess(**userIt);
+    }
+
+    void saveToFile(const std::string& filename) const {
+        std::ofstream file(filename);
+        if (!file) throw std::runtime_error("Ошибка открытия файла");
+
+        for (const auto& user : users) {
+            file << user->getName() << "," << user->getId() << "," 
+                 << user->getAccessLevel() << "\n";
+        }
+    }
+
+    void loadFromFile(const std::string& filename) {
+        std::ifstream file(filename);
+        if (!file) throw std::runtime_error("Ошибка открытия файла");
+
+        std::string line;
+        while (getline(file, line)) {
+            std::stringstream ss(line);
+            std::string name, idStr, alStr;
+            getline(ss, name, ',');
+            getline(ss, idStr, ',');
+            getline(ss, alStr, ',');
+
+            // Пример загрузки базового пользователя (можно расширить для производных)
+            users.push_back(std::make_unique<User>(
+                name, std::stoi(idStr), std::stoi(alStr)
+            ));
+        }
+    }
+
+    // Поиск пользователя по имени
+    User* findUserByName(const std::string& name) const {
+        auto it = std::find_if(users.begin(), users.end(), 
+            [name](const auto& u) { return u->getName() == name; });
+        return (it != users.end()) ? it->get() : nullptr;
+    }
+
+    // Сортировка пользователей по уровню доступа
+    void sortUsersByAccessLevel() {
+        std::sort(users.begin(), users.end(), 
+            [](const auto& a, const auto& b) { 
+                return a->getAccessLevel() < b->getAccessLevel(); 
+            });
+    }
+};
+
+// Пример использования 
+int main() {
+    try {
+        AccessControlSystem<int> system;
+
+        // Добавление пользователей
+        system.addUser(std::make_unique<Student>("Иван", 1, 1, "Группа 101"));
+        system.addUser(std::make_unique<Teacher>("Мария", 2, 3, "Кафедра ИТ"));
+        system.addUser(std::make_unique<Administrator>("Админ", 3, 5));
+
+        // Добавление ресурсов
+        system.addResource(Resource("Лаборатория", 2));
+        system.addResource(Resource("Библиотека", 1));
+        system.addResource(Resource("Серверная", 5));
+
+        // Проверка доступа
+        std::cout << "Доступ студента в лабораторию: " 
+                  << system.checkAccess(1, "Лаборатория") << std::endl; // 0 (нет доступа)
+        std::cout << "Доступ администратора в серверную: " 
+                  << system.checkAccess(3, "Серверная") << std::endl;   // 1 (есть доступ)
+
+        // Сохранение и загрузка данных
+        system.saveToFile("users.txt");
+        system.loadFromFile("users.txt");
+
+        // Поиск пользователя
+        User* user = system.findUserByName("Мария");
+        if (user) user->displayInfo();
+
+        // Сортировка и вывод
+        system.sortUsersByAccessLevel();
+
+    } catch (const std::exception& e) {
+        std::cerr << "Ошибка: " << e.what() << std::endl;
+    }
+    return 0;
+}
