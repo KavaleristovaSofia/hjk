@@ -1,0 +1,207 @@
+#include <iostream>
+#include <string>
+#include <vector>
+#include <fstream>
+#include <stdexcept>
+#include <memory>
+
+// Класс Logger 
+template<typename T>
+class Logger {
+private:
+    std::ofstream logFile;
+public:
+    Logger(const std::string& filename) {
+        logFile.open(filename, std::ios::app);
+        if (!logFile.is_open()) {
+            throw std::runtime_error("Не удалось открыть файл лога.");
+        }
+    }
+
+    void log(const T& message) {
+        logFile << message << std::endl;
+    }
+
+    ~Logger() {
+        if (logFile.is_open()) {
+            logFile.close();
+        }
+    }
+};
+
+// Базовый класс Monster
+class Monster {
+protected:
+    std::string name;
+    int health;
+    int attackPower;
+    int defense;
+public:
+    Monster(const std::string& n, int h, int a, int d)
+        : name(n), health(h), attackPower(a), defense(d) {}
+
+    virtual void attack(Character& target) {
+        int damage = attackPower - target.getDefense();
+        if (damage > 0) {
+            target.takeDamage(damage);
+            std::cout << name << " атакует " << target.getName() << " и наносит " << damage << " урона!" << std::endl;
+        } else {
+            std::cout << name << " атакует " << target.getName() << ", но безрезультатно!" << std::endl;
+        }
+    }
+
+    virtual void displayInfo() const {
+        std::cout << "Монстр: " << name << ", HP: " << health 
+                  << ", Атака: " << attackPower << ", Защита: " << defense << std::endl;
+    }
+
+    std::string getName() const { return name; }
+    int getHealth() const { return health; }
+    void takeDamage(int damage) { health -= damage; }
+    virtual ~Monster() = default;
+};
+
+//Производные классы монстров 
+class Goblin : public Monster {
+public:
+    Goblin() : Monster("Гоблин", 50, 15, 5) {}
+};
+
+class Dragon : public Monster {
+public:
+    Dragon() : Monster("Дракон", 200, 40, 20) {}
+};
+
+class Skeleton : public Monster {
+public:
+    Skeleton() : Monster("Скелет", 70, 20, 10) {}
+};
+
+// Класс Character 
+class Character {
+private:
+    std::string name;
+    int health;
+    int attackPower;
+    int defense;
+    int level;
+    int experience;
+    std::vector<std::string> inventory;
+public:
+    Character(const std::string& n, int h, int a, int d)
+        : name(n), health(h), attackPower(a), defense(d), level(1), experience(0) {}
+
+    void attackEnemy(Monster& enemy) {
+        int damage = attackPower - enemy.getDefense();
+        if (damage > 0) {
+            enemy.takeDamage(damage);
+            std::cout << name << " атакует " << enemy.getName() << " и наносит " << damage << " урона!" << std::endl;
+        } else {
+            std::cout << name << " атакует " << enemy.getName() << ", но безрезультатно!" << std::endl;
+        }
+    }
+
+    void heal(int amount) {
+        health += amount;
+        if (health > 100) health = 100;
+        std::cout << name << " восстанавливает " << amount << " HP!" << std::endl;
+    }
+
+    void gainExperience(int exp) {
+        experience += exp;
+        if (experience >= 100) {
+            level++;
+            experience -= 100;
+            std::cout << name << " повысил уровень до " << level << "!" << std::endl;
+        }
+    }
+
+    void addToInventory(const std::string& item) {
+        inventory.push_back(item);
+        std::cout << "Предмет " << item << " добавлен в инвентарь." << std::endl;
+    }
+
+    void displayInventory() const {
+        std::cout << "Инвентарь " << name << ": ";
+        for (const auto& item : inventory) {
+            std::cout << item << " ";
+        }
+        std::cout << std::endl;
+    }
+
+    void saveProgress(const std::string& filename) {
+        std::ofstream file(filename);
+        if (file) {
+            file << name << " " << health << " " << attackPower << " " 
+                 << defense << " " << level << " " << experience << std::endl;
+            std::cout << "Прогресс сохранен." << std::endl;
+        }
+    }
+
+    void loadProgress(const std::string& filename) {
+        std::ifstream file(filename);
+        if (file) {
+            file >> name >> health >> attackPower >> defense >> level >> experience;
+            std::cout << "Прогресс загружен." << std::endl;
+        }
+    }
+
+    std::string getName() const { return name; }
+    int getHealth() const { return health; }
+    int getDefense() const { return defense; }
+    void takeDamage(int damage) { 
+        health -= damage; 
+        if (health < 0) throw std::runtime_error("Персонаж погиб!");
+    }
+};
+
+// Класс Game 
+class Game {
+private:
+    Character player;
+    Logger<std::string> logger;
+public:
+    Game(const Character& c) : player(c), logger("game_log.txt") {}
+
+    void fight(Monster& monster) {
+        try {
+            while (player.getHealth() > 0 && monster.getHealth() > 0) {
+                player.attackEnemy(monster);
+                if (monster.getHealth() > 0) {
+                    monster.attack(player);
+                }
+            }
+            if (player.getHealth() > 0) {
+                player.gainExperience(50);
+                logger.log("Игрок победил " + monster.getName());
+            } else {
+                logger.log("Игрок погиб в бою с " + monster.getName());
+            }
+        } catch (const std::exception& e) {
+            std::cerr << "Ошибка: " << e.what() << std::endl;
+        }
+    }
+};
+
+int main() {
+    try {
+        Character hero("Герой", 100, 30, 10);
+        Goblin goblin;
+        Dragon dragon;
+        Skeleton skeleton;
+
+        hero.addToInventory("Меч");
+        hero.addToInventory("Зелье здоровья");
+
+        Game game(hero);
+        game.fight(goblin);
+        game.fight(skeleton);
+
+        hero.saveProgress("save.txt");
+        hero.loadProgress("save.txt");
+
+    } catch (const std::exception& e) {
+        std::cerr << "Критическая ошибка: " << e.what() << std::endl;
+    }
+    return 0;
+}
