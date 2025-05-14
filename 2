@@ -1,0 +1,42 @@
+#include <iostream>
+#include <string>
+
+class Weapon {
+private:
+    std::string name;
+    int damage;
+    double weight;
+
+public:
+    // Конструктор
+    Weapon(const std::string& n, int d, double w)
+        : name(n), damage(d), weight(w) {
+        std::cout << "Weapon \"" << name << "\" created!\n";
+    }
+
+    // Деструктор
+    ~Weapon() {
+        std::cout << "Weapon \"" << name << "\" destroyed!\n";
+    }
+    
+    // Метод для вывода информации
+    void displayInfo() const {
+        std::cout << "Название: " << name << ", Урон: " << damage
+                  << ", Вес: " << weight << " кг\n";
+    }
+};
+
+int main() {
+    // Создание объектов оружия
+    Weapon gun("Пистолет", 20, 1.5);
+    Weapon bow("Лук", 15, 2.3);
+    Weapon rifle("Винтовка", 25, 4.1);
+
+    // Вывод информации об оружии
+    std::cout << "\nИнформация об оружии:\n";
+    gun.displayInfo();
+    bow.displayInfo();
+    rifle.displayInfo();
+
+    return 0;
+}
