@@ -1,0 +1,386 @@
+#include <iostream>
+#include <fstream>
+#include <vector>
+#include <string>
+#include <stdexcept>
+
+// === Шаблонный класс для логирования событий ===
+template<typename T>
+class Logger {
+private:
+    std::ofstream logFile;
+public:
+    Logger(const std::string& filename) {
+        logFile.open(filename, std::ios::app);
+        if (!logFile.is_open()) {
+            throw std::runtime_error("Could not open log file!");
+        }
+    }
+
+    void log(const T& message) {
+        logFile << message << std::endl;
+    }
+
+    ~Logger() {
+        if (logFile.is_open())
+            logFile.close();
+    }
+};
+
+// === Класс персонажа ===
+class Character {
+private:
+    std::string name;
+    int health;
+    int attack;
+    int defense;
+    int level;
+    int experience;
+
+public:
+    Character(const std::string& n = "Hero", int h = 100, int a = 10, int d = 5)
+        : name(n), health(h), attack(a), defense(d), level(1), experience(0) {
+    }
+
+    void attackEnemy(class Monster& enemy);
+    void heal(int amount);
+    void gainExperience(int exp);
+    void displayInfo() const;
+
+    // Геттеры
+    std::string getName() const { return name; }
+    int getHealth() const { return health; }
+    int getAttack() const { return attack; }
+    int getDefense() const { return defense; }
+    int getLevel() const { return level; }
+    int getExperience() const { return experience; }
+
+    // Сеттеры
+    void setHealth(int h) { health = h; }
+    void setAttack(int a) { attack = a; }
+    void setDefense(int d) { defense = d; }
+
+    friend class Game;
+};
+
+// === Базовый класс монстра ===
+class Monster {
+protected:
+    std::string name;
+    int health;
+    int attack;
+    int defense;
+
+public:
+    Monster(const std::string& n, int h, int a, int d)
+        : name(n), health(h), attack(a), defense(d) {
+    }
+
+    virtual void attackCharacter(Character& hero);
+    virtual void displayInfo() const;
+    virtual ~Monster() = default;
+
+    // Геттеры
+    std::string getName() const { return name; }
+    int getHealth() const { return health; }
+    int getAttack() const { return attack; }
+    int getDefense() const { return defense; }
+
+    // Сеттеры
+    void setHealth(int h) { health = h; }
+    void setAttack(int a) { attack = a; }
+    void setDefense(int d) { defense = d; }
+
+    friend class Game;
+};
+
+// === Производные классы монстров ===
+class Goblin : public Monster {
+public:
+    Goblin() : Monster("Goblin", 30, 8, 2) {}
+};
+
+class Skeleton : public Monster {
+public:
+    Skeleton() : Monster("Skeleton", 40, 10, 3) {}
+};
+
+class Dragon : public Monster {
+public:
+    Dragon() : Monster("Dragon", 100, 20, 10) {}
+};
+
+// === Инвентарь ===
+class Inventory {
+private:
+    std::vector<std::string> items;
+
+public:
+    void addItem(const std::string& item);
+    void useItem(Character& hero);
+    void displayInventory() const;
+
+    const std::vector<std::string>& getItems() const { return items; } // геттер
+};
+
+// === Игровой процесс ===
+class Game {
+private:
+    Character player;
+    Inventory inventory;
+
+public:
+    void startGame();
+    void battle(Monster& monster);
+    void saveProgress();
+    void loadProgress();
+
+    Character& getPlayer() { return player; }
+    Inventory& getInventory() { return inventory; }
+};
+
+// === Реализация методов класса Character ===
+void Character::attackEnemy(Monster& enemy) {
+    int damage = getAttack() - enemy.getDefense();
+    if (damage > 0) {
+        enemy.setHealth(enemy.getHealth() - damage);
+        std::cout << getName() << " атакует " << enemy.getName() << " на " << damage << " урона!" << std::endl;
+    }
+    else {
+        std::cout << getName() << " атакует " << enemy.getName() << ", но без результата!" << std::endl;
+    }
+}
+
+void Character::heal(int amount) {
+    if (getHealth() <= 0)
+        throw std::runtime_error("Cannot heal a dead character!");
+
+    setHealth(getHealth() + amount);
+    if (getHealth() > 100) setHealth(100);
+    std::cout << getName() << " восстанавливает " << amount << " HP!" << std::endl;
+}
+
+void Character::gainExperience(int exp) {
+    experience += exp;
+    while (experience >= level * 100) {
+        experience -= level * 100;
+        level++;
+        attack += 5;
+        defense += 2;
+        std::cout << getName() << " достиг уровня " << level << "!" << std::endl;
+    }
+}
+
+void Character::displayInfo() const {
+    std::cout << "Имя: " << getName() << ", HP: " << getHealth()
+        << ", Атака: " << getAttack() << ", Защита: " << getDefense()
+        << ", Уровень: " << level << ", Опыт: " << experience << std::endl;
+}
+
+// === Реализация методов класса Monster ===
+void Monster::attackCharacter(Character& hero) {
+    int damage = getAttack() - hero.getDefense();
+    if (damage > 0) {
+        hero.setHealth(hero.getHealth() - damage);
+        std::cout << getName() << " атакует вас на " << damage << " урона!" << std::endl;
+    }
+    else {
+        std::cout << getName() << " атакует вас, но без результата!" << std::endl;
+    }
+}
+
+void Monster::displayInfo() const {
+    std::cout << "Монстр: " << getName() << ", HP: " << getHealth()
+        << ", Атака: " << getAttack() << ", Защита: " << getDefense() << std::endl;
+}
+
+// === Реализация методов класса Inventory ===
+void Inventory::addItem(const std::string& item) {
+    items.push_back(item);
+    std::cout << "Предмет \"" << item << "\" добавлен в инвентарь." << std::endl;
+}
+
+void Inventory::useItem(Character& hero) {
+    if (items.empty()) {
+        std::cout << "Инвентарь пуст!" << std::endl;
+        return;
+    }
+
+    std::cout << "Доступные предметы:\n";
+    for (size_t i = 0; i < items.size(); ++i) {
+        std::cout << i + 1 << ". " << items[i] << "\n";
+    }
+
+    int choice;
+    std::cout << "Выберите номер предмета для использования: ";
+    std::cin >> choice;
+
+    if (choice < 1 || choice > static_cast<int>(items.size())) {
+        std::cout << "Неверный выбор!\n";
+        return;
+    }
+
+    if (items[choice - 1] == "Зелье лечения") {
+        hero.heal(30);
+        items.erase(items.begin() + (choice - 1));
+    }
+    else {
+        std::cout << "Неизвестный предмет.\n";
+    }
+}
+
+void Inventory::displayInventory() const {
+    if (items.empty()) {
+        std::cout << "Инвентарь пуст.\n";
+        return;
+    }
+    std::cout << "Ваш инвентарь:\n";
+    for (const auto& item : items) {
+        std::cout << "- " << item << "\n";
+    }
+}
+
+// === Реализация методов класса Game ===
+void Game::startGame() {
+    std::cout << "Добро пожаловать в RPG-игру!\n";
+    std::cout << "Введите имя вашего героя: ";
+    std::cin >> player.name;
+
+    inventory.addItem("Зелье лечения");
+
+    bool running = true;
+    while (running && player.getHealth() > 0) {
+        std::cout << "\n=== Меню ===\n"
+            << "1. Начать бой\n"
+            << "2. Показать информацию\n"
+            << "3. Использовать предмет\n"
+            << "4. Сохранить игру\n"
+            << "5. Загрузить игру\n"
+            << "6. Выход\n";
+
+        int choice;
+        std::cin >> choice;
+
+        switch (choice) {
+        case 1: {
+            int monsterType;
+            std::cout << "Выберите монстра (1 - Гоблин, 2 - Скелет, 3 - Дракон): ";
+            std::cin >> monsterType;
+
+            Monster* monster = nullptr;
+            if (monsterType == 1) monster = new Goblin();
+            else if (monsterType == 2) monster = new Skeleton();
+            else if (monsterType == 3) monster = new Dragon();
+            else {
+                std::cout << "Неверный выбор.\n";
+                continue;
+            }
+
+            battle(*monster);
+            delete monster;
+            break;
+        }
+        case 2:
+            player.displayInfo();
+            inventory.displayInventory();
+            break;
+        case 3:
+            inventory.useItem(player);
+            break;
+        case 4:
+            saveProgress();
+            break;
+        case 5:
+            loadProgress();
+            break;
+        case 6:
+            running = false;
+            break;
+        default:
+            std::cout << "Ошибка ввода.\n";
+        }
+    }
+
+    if (player.getHealth() <= 0) {
+        std::cout << "Вы проиграли! Игра окончена.\n";
+    }
+}
+
+void Game::battle(Monster& monster) {
+    std::cout << "Битва с " << monster.getName() << " начинается!\n";
+    Logger<std::string> logger("battle_log.txt");
+
+    try {
+        while (player.getHealth() > 0 && monster.getHealth() > 0) {
+            player.attackEnemy(monster);
+            logger.log(player.getName() + " attacked " + monster.getName());
+
+            if (monster.getHealth() <= 0) {
+                std::cout << monster.getName() << " побеждён!\n";
+                player.gainExperience(50);
+                inventory.addItem("Зелье лечения");
+                logger.log(monster.getName() + " was defeated by " + player.getName());
+                break;
+            }
+
+            monster.attackCharacter(player);
+            logger.log(monster.getName() + " attacked " + player.getName());
+        }
+    }
+    catch (const std::exception& e) {
+        std::cerr << "Ошибка: " << e.what() << std::endl;
+    }
+}
+
+void Game::saveProgress() {
+    std::ofstream out("savegame.dat", std::ios::binary);
+    if (!out) {
+        std::cerr << "Не удалось открыть файл для сохранения.\n";
+        return;
+    }
+
+    out.write(reinterpret_cast<char*>(&player), sizeof(player));
+    int itemCount = inventory.getItems().size();
+    out.write(reinterpret_cast<char*>(&itemCount), sizeof(itemCount));
+
+    for (const auto& item : inventory.getItems()) {
+        int len = item.size();
+        out.write(reinterpret_cast<char*>(&len), sizeof(len));
+        out.write(item.c_str(), len);
+    }
+
+    std::cout << "Прогресс сохранён.\n";
+}
+
+void Game::loadProgress() {
+    std::ifstream in("savegame.dat", std::ios::binary);
+    if (!in) {
+        std::cerr << "Файл сохранения не найден.\n";
+        return;
+    }
+
+    in.read(reinterpret_cast<char*>(&player), sizeof(player));
+    int itemCount;
+    in.read(reinterpret_cast<char*>(&itemCount), sizeof(itemCount));
+
+    inventory = Inventory(); // очищаем текущий инвентарь
+    for (int i = 0; i < itemCount; ++i) {
+        int len;
+        in.read(reinterpret_cast<char*>(&len), sizeof(len));
+        char* buffer = new char[len + 1];
+        in.read(buffer, len);
+        buffer[len] = '\0';
+        inventory.addItem(std::string(buffer));
+        delete[] buffer;
+    }
+
+    std::cout << "Прогресс загружен.\n";
+}
+
+// === Точка входа ===
+int main() {
+    setlocale(LC_ALL, "Russian");
+    Game game;
+    game.startGame();
+    return 0;
+}
